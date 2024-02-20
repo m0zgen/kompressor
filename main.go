@@ -1,0 +1,247 @@
+package main
+
+import (
+	"bufio"
+	"crypto/md5"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/fsnotify/fsnotify"
+)
+
+var (
+	mutex sync.Mutex
+	// Increase the size of the channel buffer to avoid blocking the goroutine that tracks changes
+	processFileChannel = make(chan string, 10)
+)
+
+func calculateHash(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hash := md5.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
+}
+
+func removeDuplicates(directoryPath string) error {
+	hashMap := make(map[string]string)
+
+	err := filepath.Walk(directoryPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			hash, err := calculateHash(path)
+			if err != nil {
+				return err
+			}
+
+			if existingPath, ok := hashMap[hash]; ok {
+				fmt.Printf("Removing duplicate: %s (duplicate of %s)\n", path, existingPath)
+				err := os.Remove(path)
+				if err != nil {
+					return err
+				}
+			} else {
+				hashMap[hash] = path
+			}
+		}
+		return nil
+	})
+
+	return err
+}
+
+func sortAndRemoveDuplicates(filePath string) error {
+	lines := make([]string, 0)
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Ignore empty lines
+		if line == "" {
+			continue
+		}
+		// Ignore lines starting with comments
+		if strings.HasPrefix(strings.TrimSpace(line), "#") || strings.HasPrefix(strings.TrimSpace(line), "//") {
+			continue
+		}
+		lines = append(lines, line)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	// Sort the lines
+	sort.Strings(lines)
+
+	// Delete duplicates
+	uniqueLines := make(map[string]bool)
+	for _, line := range lines {
+		uniqueLines[line] = true
+	}
+
+	// Record sorted and unique lines back to the file
+	file, err = os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	for line := range uniqueLines {
+		_, err := file.WriteString(line + "\n")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func processFiles(directoryPath string) error {
+	err := filepath.Walk(directoryPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			// Sort and remove duplicates
+			err := sortAndRemoveDuplicates(path)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
+	return err
+}
+
+func processFile(filePath string) {
+
+	fmt.Printf("Processing file: %s\n", filePath)
+	err := sortAndRemoveDuplicates(filePath)
+	if err != nil {
+		fmt.Printf("Error processing file %s: %v\n", filePath, err)
+	}
+}
+
+func watchDirectory(directoryPath string) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		fmt.Printf("Error creating watcher: %v\n", err)
+		return
+	}
+	defer watcher.Close()
+
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				//fmt.Printf("Event: %+v\n", event)
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					time.Sleep(1 * time.Second) // Wait for some time to make sure the file is completely written
+
+					mutex.Lock()
+					defer mutex.Unlock()
+					if _, err := os.Stat(event.Name); err == nil {
+						processFile(event.Name)
+						//mutex.Unlock()
+
+					}
+
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				fmt.Printf("Error: %v\n", err)
+			}
+		}
+	}()
+
+	err = filepath.Walk(directoryPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			// Initial processing of existing files
+			processFile(path)
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("Error walking directory: %v\n", err)
+		return
+	}
+
+	err = watcher.Add(directoryPath)
+	if err != nil {
+		fmt.Printf("Error adding directory to watcher: %v\n", err)
+		return
+	}
+
+	fmt.Printf("Watching directory: %s\n", directoryPath)
+
+	select {}
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run main.go <directory-path> [-watch]")
+		os.Exit(1)
+	}
+
+	directoryPath := os.Args[1]
+	watch := false
+
+	// Check for the -watch argument
+	if len(os.Args) == 3 && os.Args[2] == "-watch" {
+		watch = true
+	}
+
+	err := removeDuplicates(directoryPath)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	_err := processFiles(directoryPath)
+	if _err != nil {
+		fmt.Printf("Error: %v\n", _err)
+		os.Exit(1)
+	}
+
+	fmt.Println("Sorting and removing duplicates completed successfully.")
+
+	if watch {
+		// Run a goroutine to track changes in the directory
+		go watchDirectory(directoryPath)
+		// Stay the program running so that the goroutine for tracking changes can continue to listen for events
+		select {}
+	}
+
+}
