@@ -3,3 +3,4 @@
 kompressor
 tools/builds
 upload*
+*.debug
