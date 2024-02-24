@@ -20,6 +20,7 @@ WORKDIR /app
 RUN go build -gcflags="all=-N -l" -o /server
 
 # Final stage
+# Bookworm Debian image
 FROM debian:bookworm
 
 # Expose the port on which the debugger will listen
