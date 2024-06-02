@@ -1,3 +1,6 @@
+# Example Deockerfile for remote go debugging
+# Created by Yevgeniy Goncharov, https://lab.sys-adm.in
+
 # Use the official Golang image to create a build artifact.
 FROM golang:1.22 AS build-env
 
@@ -17,6 +20,7 @@ WORKDIR /app
 RUN go build -gcflags="all=-N -l" -o /server
 
 # Final stage
+# Bookworm Debian image
 FROM debian:bookworm
 
 # Expose the port on which the debugger will listen
