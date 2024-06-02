@@ -92,14 +92,20 @@ func sortAndRemoveDuplicates(filePath string) error {
 		return err
 	}
 
-	// Sort the lines
-	sort.Strings(lines)
-
 	// Delete duplicates
 	uniqueLines := make(map[string]bool)
 	for _, line := range lines {
 		uniqueLines[line] = true
 	}
+
+	// Создаем срез для хранения значений уникальных строк
+	var linesSlice []string
+	for line := range uniqueLines {
+		linesSlice = append(linesSlice, line)
+	}
+
+	// Sort the lines
+	sort.Strings(linesSlice)
 
 	// Record sorted and unique lines back to the file
 	file, err = os.Create(filePath)
@@ -108,8 +114,9 @@ func sortAndRemoveDuplicates(filePath string) error {
 	}
 	defer file.Close()
 
-	for line := range uniqueLines {
-		_, err := file.WriteString(line + "\n")
+	for line := range linesSlice {
+		_, err := file.WriteString(linesSlice[line] + "\n")
+		//fmt.Printf("Writing line: %s\n", line)
 		if err != nil {
 			return err
 		}
