@@ -1,2 +1,0 @@
-d504da93a0dc8f1c5d409910b95550b4ebd79c79001a552383f6cbb89f83e56b  zbld_0.3.1_darwin_amd64.tar.gz
-ca7c28c68edb8fb898dea90e3ac29ade0a20b6282148adc7741fa933764f3aac  zbld_0.3.1_linux_amd64.tar.gz
