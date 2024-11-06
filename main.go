@@ -228,7 +228,7 @@ func main() {
 	var directoryPath string
 
 	watch := false
-	version := "0.3.3"
+	version := "0.3.4"
 
 	// Add arg flag parser: version, path, watch
 	versionFlag := flag.Bool("version", false, "Print the version of the program")
