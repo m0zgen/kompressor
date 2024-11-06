@@ -22,6 +22,7 @@ var (
 	processFileChannel = make(chan string, 10)
 )
 
+// calculateHash - Calculate the MD5 hash of the file
 func calculateHash(filePath string) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -37,6 +38,7 @@ func calculateHash(filePath string) (string, error) {
 	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
+// removeDuplicates - Remove duplicate files in the directory
 func removeDuplicates(directoryPath string) error {
 	hashMap := make(map[string]string)
 
@@ -66,6 +68,7 @@ func removeDuplicates(directoryPath string) error {
 	return err
 }
 
+// sortAndRemoveDuplicates - Sort and remove duplicate lines in the file
 func sortAndRemoveDuplicates(filePath string) error {
 	lines := make([]string, 0)
 
@@ -99,7 +102,7 @@ func sortAndRemoveDuplicates(filePath string) error {
 		uniqueLines[line] = true
 	}
 
-	// Создаем срез для хранения значений уникальных строк
+	// Create a slice to store the values of unique lines
 	var linesSlice []string
 	for line := range uniqueLines {
 		linesSlice = append(linesSlice, line)
@@ -126,6 +129,7 @@ func sortAndRemoveDuplicates(filePath string) error {
 	return nil
 }
 
+// processFiles - Process all files in the target directory
 func processFiles(directoryPath string) error {
 	err := filepath.Walk(directoryPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -144,6 +148,7 @@ func processFiles(directoryPath string) error {
 	return err
 }
 
+// processFile - Process a single file
 func processFile(filePath string) {
 
 	fmt.Printf("Processing file: %s\n", filePath)
@@ -153,6 +158,7 @@ func processFile(filePath string) {
 	}
 }
 
+// watchDirectory - Track changes in the directory (TESTING)
 func watchDirectory(directoryPath string) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -220,6 +226,8 @@ func watchDirectory(directoryPath string) {
 func main() {
 
 	var directoryPath string
+
+	watch := false
 	version := "0.3.3"
 
 	// Add arg flag parser: version, path, watch
@@ -229,6 +237,7 @@ func main() {
 
 	flag.Parse()
 
+	// Check for the required arguments
 	if len(os.Args) < 2 || pathFlag == nil {
 		fmt.Println("Usage: go run main.go <directory-path> [-watch]")
 		os.Exit(1)
@@ -248,8 +257,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	watch := false
-
 	// Check for the -watch argument
 	if len(os.Args) == 3 && os.Args[2] == "-watch" {
 		watch = true
@@ -257,18 +264,21 @@ func main() {
 		watch = true
 	}
 
+	// Check if the directory exists and remove duplicates
 	err := removeDuplicates(directoryPath)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
+	// Process all files in the directory
 	_err := processFiles(directoryPath)
 	if _err != nil {
 		fmt.Printf("Error: %v\n", _err)
 		os.Exit(1)
 	}
 
+	// Finish the program
 	fmt.Println("Sorting and removing duplicates completed successfully.")
 
 	if watch {
