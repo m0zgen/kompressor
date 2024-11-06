@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/md5"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -217,16 +218,42 @@ func watchDirectory(directoryPath string) {
 }
 
 func main() {
-	if len(os.Args) < 2 {
+
+	var directoryPath string
+	version := "0.3.3"
+
+	// Add arg flag parser: version, path, watch
+	versionFlag := flag.Bool("version", false, "Print the version of the program")
+	pathFlag := flag.String("path", "", "The path to the directory to process")
+	watchFlag := flag.Bool("watch", false, "Watch the directory for changes")
+
+	flag.Parse()
+
+	if len(os.Args) < 2 || pathFlag == nil {
 		fmt.Println("Usage: go run main.go <directory-path> [-watch]")
 		os.Exit(1)
 	}
 
-	directoryPath := os.Args[1]
+	if versionFlag != nil && *versionFlag {
+		fmt.Println("Version:", version)
+		os.Exit(0)
+	}
+
+	if os.Args[1] != "" {
+		directoryPath = os.Args[1]
+	} else if *pathFlag != "" {
+		directoryPath = *pathFlag
+	} else {
+		fmt.Println("Usage: go run main.go <directory-path> [-watch]")
+		os.Exit(1)
+	}
+
 	watch := false
 
 	// Check for the -watch argument
 	if len(os.Args) == 3 && os.Args[2] == "-watch" {
+		watch = true
+	} else if watchFlag != nil && *watchFlag {
 		watch = true
 	}
 
