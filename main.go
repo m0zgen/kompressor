@@ -70,63 +70,55 @@ func removeDuplicates(directoryPath string) error {
 
 // sortAndRemoveDuplicates - Sort and remove duplicate lines in the file
 func sortAndRemoveDuplicates(filePath string) error {
-	lines := make([]string, 0)
-
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		// Ignore empty lines
-		if line == "" {
-			continue
+	uniqueLines := make(map[string]struct{})
+	// use Reader instead previous Scanner, fix: "token too long" error
+	reader := bufio.NewReader(file)
+
+	for {
+		line, err := reader.ReadString('\n')
+		trimmedLine := strings.TrimSpace(line)
+
+		// Пропускаем пустые и комменты
+		if trimmedLine != "" && !strings.HasPrefix(trimmedLine, "#") && !strings.HasPrefix(trimmedLine, "//") {
+			uniqueLines[trimmedLine] = struct{}{}
 		}
-		// Ignore lines starting with comments
-		if strings.HasPrefix(strings.TrimSpace(line), "#") || strings.HasPrefix(strings.TrimSpace(line), "//") {
-			continue
-		}
-		lines = append(lines, line)
-	}
 
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-
-	// Delete duplicates
-	uniqueLines := make(map[string]bool)
-	for _, line := range lines {
-		uniqueLines[line] = true
-	}
-
-	// Create a slice to store the values of unique lines
-	var linesSlice []string
-	for line := range uniqueLines {
-		linesSlice = append(linesSlice, line)
-	}
-
-	// Sort the lines
-	sort.Strings(linesSlice)
-
-	// Record sorted and unique lines back to the file
-	file, err = os.Create(filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	for line := range linesSlice {
-		_, err := file.WriteString(linesSlice[line] + "\n")
-		//fmt.Printf("Writing line: %s\n", line)
 		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			file.Close()
 			return err
 		}
 	}
+	file.Close()
 
-	return nil
+	// Сортировка
+	linesSlice := make([]string, 0, len(uniqueLines))
+	for line := range uniqueLines {
+		linesSlice = append(linesSlice, line)
+	}
+	sort.Strings(linesSlice)
+
+	// Перезапись файла
+	outFile, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	writer := bufio.NewWriter(outFile)
+	for _, line := range linesSlice {
+		if _, err := writer.WriteString(line + "\n"); err != nil {
+			return err
+		}
+	}
+	return writer.Flush()
 }
 
 // processFiles - Process all files in the target directory
