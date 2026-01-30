@@ -83,7 +83,7 @@ func sortAndRemoveDuplicates(filePath string) error {
 		line, err := reader.ReadString('\n')
 		trimmedLine := strings.TrimSpace(line)
 
-		// Пропускаем пустые и комменты
+		// skip this
 		if trimmedLine != "" && !strings.HasPrefix(trimmedLine, "#") && !strings.HasPrefix(trimmedLine, "//") {
 			uniqueLines[trimmedLine] = struct{}{}
 		}
@@ -98,14 +98,14 @@ func sortAndRemoveDuplicates(filePath string) error {
 	}
 	file.Close()
 
-	// Сортировка
+	// sort
 	linesSlice := make([]string, 0, len(uniqueLines))
 	for line := range uniqueLines {
 		linesSlice = append(linesSlice, line)
 	}
 	sort.Strings(linesSlice)
 
-	// Перезапись файла
+	// rewrite
 	outFile, err := os.Create(filePath)
 	if err != nil {
 		return err
