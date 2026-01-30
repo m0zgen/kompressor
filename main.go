@@ -270,6 +270,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	// TODO: Check and Remove duplicates again?
+
 	// Finish the program
 	fmt.Println("Sorting and removing duplicates completed successfully.")
 
