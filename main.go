@@ -216,70 +216,55 @@ func watchDirectory(directoryPath string) {
 }
 
 func main() {
-
 	var directoryPath string
 
 	watch := false
-	version := "0.3.6"
+	version := "0.3.7"
 
-	// Add arg flag parser: version, path, watch
 	versionFlag := flag.Bool("version", false, "Print the version of the program")
 	pathFlag := flag.String("path", "", "The path to the directory to process")
 	watchFlag := flag.Bool("watch", false, "Watch the directory for changes")
+	removeFlag := flag.Bool("remove", false, "Remove duplicate files by content hash")
 
 	flag.Parse()
 
-	// Check for the required arguments
-	if len(os.Args) < 2 || pathFlag == nil {
-		fmt.Println("Usage: go run main.go <directory-path> [-watch]")
-		os.Exit(1)
-	}
-
-	if versionFlag != nil && *versionFlag {
+	if *versionFlag {
 		fmt.Println("Version:", version)
 		os.Exit(0)
 	}
 
-	if os.Args[1] != "" {
-		directoryPath = os.Args[1]
-	} else if *pathFlag != "" {
+	if *pathFlag != "" {
 		directoryPath = *pathFlag
+	} else if flag.NArg() > 0 {
+		directoryPath = flag.Arg(0)
 	} else {
-		fmt.Println("Usage: go run main.go <directory-path> [-watch]")
+		fmt.Println("Usage: kompressor <directory-path> [-watch] [-remove]")
 		os.Exit(1)
 	}
 
-	// Check for the -watch argument
-	if len(os.Args) == 3 && os.Args[2] == "-watch" {
-		watch = true
-	} else if watchFlag != nil && *watchFlag {
+	if *watchFlag {
 		watch = true
 	}
 
-	// Check if the directory exists and remove duplicates
-	err := removeDuplicates(directoryPath)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+	if *removeFlag {
+		fmt.Println("Duplicate file removal is enabled")
+		if err := removeDuplicates(directoryPath); err != nil {
+			fmt.Printf("Error removing duplicate files: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		fmt.Println("Duplicate file removal is disabled")
+	}
+
+	if err := processFiles(directoryPath); err != nil {
+		fmt.Printf("Error processing files: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Process all files in the directory
-	_err := processFiles(directoryPath)
-	if _err != nil {
-		fmt.Printf("Error: %v\n", _err)
-		os.Exit(1)
-	}
-
-	// TODO: Check and Remove duplicates again?
-
-	// Finish the program
-	fmt.Println("Sorting and removing duplicates completed successfully.")
+	fmt.Println("Sorting and removing duplicate lines completed successfully.")
 
 	if watch {
-		// Run a goroutine to track changes in the directory
 		go watchDirectory(directoryPath)
-		// Stay the program running so that the goroutine for tracking changes can continue to listen for events
 		select {}
 	}
-
 }
