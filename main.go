@@ -20,7 +20,38 @@ var (
 	mutex sync.Mutex
 	// Increase the size of the channel buffer to avoid blocking the goroutine that tracks changes
 	processFileChannel = make(chan string, 10)
+
+	// Флаги фильтрации расширений
+	extAllow string
+	extBlock string
 )
+
+// shouldProcess - проверяет, нужно ли обрабатывать файл на основе его расширения
+func shouldProcess(filePath string) bool {
+	// Приводим к нижнему регистру и убираем точку в начале, если она есть (например, ".txt" -> "txt")
+	ext := strings.ToLower(filepath.Ext(filePath))
+	ext = strings.TrimPrefix(ext, ".")
+
+	// 1. Проверяем черный список (исключения)
+	if extBlock != "" {
+		blocked := strings.Split(extBlock, ",")
+		for _, b := range blocked {
+			if ext == strings.TrimSpace(strings.ToLower(b)) {
+				return false // Расширение в черном списке, пропускаем
+			}
+		}
+	}
+
+	// 2. Проверяем белый список (разрешенные). По умолчанию: txt
+	allowed := strings.Split(extAllow, ",")
+	for _, a := range allowed {
+		if ext == strings.TrimSpace(strings.ToLower(a)) {
+			return true // Нашли совпадение в белом списке
+		}
+	}
+
+	return false
+}
 
 // calculateHash - Calculate the MD5 hash of the file
 func calculateHash(filePath string) (string, error) {
@@ -47,6 +78,11 @@ func removeDuplicates(directoryPath string) error {
 			return err
 		}
 		if !info.IsDir() {
+			// Проверка расширения перед расчетом хеша
+			if !shouldProcess(path) {
+				return nil
+			}
+
 			hash, err := calculateHash(path)
 			if err != nil {
 				return err
@@ -128,6 +164,11 @@ func processFiles(directoryPath string) error {
 			return err
 		}
 		if !info.IsDir() {
+			// Проверка расширения перед обработкой содержимого
+			if !shouldProcess(path) {
+				return nil
+			}
+
 			// Sort and remove duplicates
 			err := sortAndRemoveDuplicates(path)
 			if err != nil {
@@ -142,6 +183,10 @@ func processFiles(directoryPath string) error {
 
 // processFile - Process a single file
 func processFile(filePath string) {
+	// Проверка расширения для одиночных файлов (актуально при изменениях в watch)
+	if !shouldProcess(filePath) {
+		return
+	}
 
 	fmt.Printf("Processing file: %s\n", filePath)
 	err := sortAndRemoveDuplicates(filePath)
@@ -166,18 +211,14 @@ func watchDirectory(directoryPath string) {
 				if !ok {
 					return
 				}
-				//fmt.Printf("Event: %+v\n", event)
 				if event.Op&fsnotify.Write == fsnotify.Write {
 					time.Sleep(1 * time.Second) // Wait for some time to make sure the file is completely written
 
 					mutex.Lock()
-					defer mutex.Unlock()
 					if _, err := os.Stat(event.Name); err == nil {
 						processFile(event.Name)
-						//mutex.Unlock()
-
 					}
-
+					mutex.Unlock()
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
@@ -226,6 +267,10 @@ func main() {
 	watchFlag := flag.Bool("watch", false, "Watch the directory for changes")
 	removeFlag := flag.Bool("remove", false, "Remove duplicate files by content hash")
 
+	// Регистрация новых флагов
+	flag.StringVar(&extAllow, "ext", "txt", "Comma-separated list of allowed extensions to process")
+	flag.StringVar(&extBlock, "exclude", "", "Comma-separated list of extensions to exclude from processing")
+
 	flag.Parse()
 
 	if *versionFlag {
@@ -238,7 +283,7 @@ func main() {
 	} else if flag.NArg() > 0 {
 		directoryPath = flag.Arg(0)
 	} else {
-		fmt.Println("Usage: kompressor <directory-path> [-watch] [-remove]")
+		fmt.Println("Usage: kompressor <directory-path> [-watch] [-remove] [-ext txt] [-exclude bld,bldz]")
 		os.Exit(1)
 	}
 

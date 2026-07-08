@@ -1,6 +1,6 @@
 # Kompressor
 
-Kompressor is a small utility for cleaning and normalizing text files inside a directory.
+Kompressor is a small utility for cleaning and normalizing text (default `txt`) files inside a directory.
 
 It is designed mainly for blocklist / allowlist style text files.
 
@@ -57,6 +57,24 @@ Example with duplicate file removal:
 ./kompressor -path /opt/benZine/output -remove
 ```
 
+Process only `log` and `ini` files:
+
+```bash
+kompressor ./my_dir -ext log,ini
+```
+
+Exclude specific files `bld` and `csv`:
+
+```bash
+kompressor ./my_dir -exclude bld,csv
+```
+
+Allow processing `txt` and `cfg` files, but strictly block `bld`:
+
+```bash
+kompressor ./my_dir -ext txt,cfg -exclude bld
+```
+
 ## Code integration
 
 ```go
@@ -66,3 +84,5 @@ cmd := exec.Command(kompressorPath, cleanPath)
 ```go
 cmd := exec.Command(kompressorPath, cleanPath, "-remove")
 ```
+
+
