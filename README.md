@@ -75,6 +75,18 @@ Allow processing `txt` and `cfg` files, but strictly block `bld`:
 kompressor ./my_dir -ext txt,cfg -exclude bld
 ```
 
+Allow processing all:
+
+```bash
+kompressor ./my_dir -ext "*"
+```
+
+Or:
+
+```bash
+kompressor ./my_dir -ext "*" -exclude bld,csv
+```
+
 ## Code integration
 
 ```go

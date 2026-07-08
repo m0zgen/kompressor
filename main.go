@@ -27,7 +27,7 @@ var (
 )
 
 // shouldProcess - проверяет, нужно ли обрабатывать файл на основе его расширения
-func shouldProcess(filePath string) bool {
+func shouldProcess_(filePath string) bool {
 	// Приводим к нижнему регистру и убираем точку в начале, если она есть (например, ".txt" -> "txt")
 	ext := strings.ToLower(filepath.Ext(filePath))
 	ext = strings.TrimPrefix(ext, ".")
@@ -47,6 +47,38 @@ func shouldProcess(filePath string) bool {
 	for _, a := range allowed {
 		if ext == strings.TrimSpace(strings.ToLower(a)) {
 			return true // Нашли совпадение в белом списке
+		}
+	}
+
+	return false
+}
+
+// shouldProcess + all files as allowed if extAllow is "*"
+func shouldProcess(filePath string) bool {
+	// Приводим к нижнему регистру и убираем точку в начале, если она есть (например, ".txt" -> "txt")
+	ext := strings.ToLower(filepath.Ext(filePath))
+	ext = strings.TrimPrefix(ext, ".")
+
+	// 1. Проверяем черный список (исключения) — он всегда в приоритете
+	if extBlock != "" {
+		blocked := strings.Split(extBlock, ",")
+		for _, b := range blocked {
+			if ext == strings.TrimSpace(strings.ToLower(b)) {
+				return false // Расширение в черном списке, пропускаем в любом случае
+			}
+		}
+	}
+
+	// 2. Если в -ext передана звёздочка, разрешаем вообще любой файл
+	if extAllow == "*" {
+		return true
+	}
+
+	// 3. Проверяем белый список (если там не звёздочка, а конкретные расширения)
+	allowed := strings.Split(extAllow, ",")
+	for _, a := range allowed {
+		if ext == strings.TrimSpace(strings.ToLower(a)) {
+			return true 
 		}
 	}
 
