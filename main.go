@@ -295,11 +295,11 @@ func main() {
 	version := "0.3.7"
 
 	versionFlag := flag.Bool("version", false, "Print the version of the program")
-	pathFlag := flag.String("path", "", "The path to the directory to process")
+	pathFlag := flag.String("path", "", "The path to the directory or file to process")
 	watchFlag := flag.Bool("watch", false, "Watch the directory for changes")
 	removeFlag := flag.Bool("remove", false, "Remove duplicate files by content hash")
 
-	// Регистрация новых флагов
+	// Регистрация флагов фильтрации
 	flag.StringVar(&extAllow, "ext", "txt", "Comma-separated list of allowed extensions to process")
 	flag.StringVar(&extBlock, "exclude", "", "Comma-separated list of extensions to exclude from processing")
 
@@ -315,7 +315,7 @@ func main() {
 	} else if flag.NArg() > 0 {
 		directoryPath = flag.Arg(0)
 	} else {
-		fmt.Println("Usage: kompressor <directory-path> [-watch] [-remove] [-ext txt] [-exclude bld,bldz]")
+		fmt.Println("Usage: kompressor <directory-path|file-path> [-watch] [-remove] [-ext txt]")
 		os.Exit(1)
 	}
 
@@ -323,6 +323,32 @@ func main() {
 		watch = true
 	}
 
+	// Проверяем, что нам передали: файл или папку
+	fileInfo, err := os.Stat(directoryPath)
+	if err != nil {
+		fmt.Printf("Error checking path: %v\n", err)
+		os.Exit(1)
+	}
+
+	// ЛОГИКА ДЛЯ ОДНОЧНОГО ФАЙЛА
+	if !fileInfo.IsDir() {
+		if *watchFlag {
+			fmt.Println("Warning: -watch flag is ignored for a single file.")
+		}
+		if *removeFlag {
+			fmt.Println("Warning: -remove flag is ignored for a single file.")
+		}
+
+		fmt.Printf("Processing single file: %s\n", directoryPath)
+		if err := sortAndRemoveDuplicates(directoryPath); err != nil {
+			fmt.Printf("Error processing file: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Sorting and removing duplicate lines completed successfully.")
+		return // Завершаем работу, так как это был один файл
+	}
+
+	// ЛОГИКА ДЛЯ ДИРЕКТОРИИ (остается прежней)
 	if *removeFlag {
 		fmt.Println("Duplicate file removal is enabled")
 		if err := removeDuplicates(directoryPath); err != nil {
